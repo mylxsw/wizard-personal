@@ -1,0 +1,6 @@
+{
+  "app_name": "WizardPersonal",
+  "icon_path_darwin": "resources/wizard.icns",
+  "icon_path_linux": "resources/wizard.png",
+  "icon_path_windows": "resources/wizard.ico"
+}
