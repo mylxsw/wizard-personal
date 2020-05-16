@@ -57,6 +57,7 @@ type RepositoryConf struct {
 	StorageDir string    `json:"storage_dir"`
 	Type       AuthType  `json:"type"`
 	AuthConf   *AuthConf `json:"auth_conf"`
+	Readonly   bool      `json:"readonly"`
 }
 
 func (rc *RepositoryConf) Init(repoConf *Conf) {

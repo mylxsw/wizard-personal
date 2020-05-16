@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,9 @@ import (
 // ErrRepositoryNotExist 仓库不存在错误
 var ErrRepositoryNotExist = errors.New("repository is not exist")
 
+// ErrRepositoryNameExisted 同名的仓库已经存在
+var ErrRepositoryNameExisted = errors.New("repository with same name already existed")
+
 // Repo Git 仓库
 type Repo struct {
 	cc   container.Container
@@ -38,9 +42,69 @@ func NewRepo(cc container.Container) *Repo {
 	return &Repo{cc: cc, conf: configs.Get(cc)}
 }
 
+// RemoveRepository 删除仓库配置
+func (repo Repo) RemoveRepository(name string) error {
+	conf, err := repo.LoadConf()
+	if err != nil {
+		return errors.Wrap(err, "load config failed")
+	}
+
+	deleteIndex := -1
+	for i, rep := range conf.Repositories {
+		if rep.Name == name {
+			deleteIndex = i
+			break
+		}
+	}
+
+	if deleteIndex >= 0 {
+		conf.Repositories = append(conf.Repositories[:deleteIndex], conf.Repositories[deleteIndex+1:]...)
+	}
+
+	if err := utils.WriteJSONFile(repo.configFilePath(), conf); err != nil {
+		return errors.Wrap(err, "写入配置文件失败")
+	}
+
+	return nil
+}
+
+// AddRepository 新增仓库配置
+func (repo Repo) AddRepository(r RepositoryConf) error {
+	conf, err := repo.LoadConf()
+	if err != nil {
+		return errors.Wrap(err, "load config failed")
+	}
+
+	for _, rep := range conf.Repositories {
+		if rep.Name == r.Name {
+			return ErrRepositoryNameExisted
+		}
+	}
+
+	r.StorageDir, err = repo.buildRepositoryStorageDir(r.URL)
+	if err == nil {
+		return err
+	}
+	if r.Branch == "" {
+		r.Branch = "master"
+	}
+
+	conf.Repositories = append(conf.Repositories, r)
+	if err := utils.WriteJSONFile(repo.configFilePath(), conf); err != nil {
+		return errors.Wrap(err, "写入配置文件失败")
+	}
+
+	return nil
+}
+
+// configFilePah 返回配置文件路径
+func (repo Repo) configFilePath() string {
+	return filepath.Join(repo.conf.WorkDir, ".wizard-personal.json")
+}
+
 // LoadConf 加载仓库配置
 func (repo Repo) LoadConf() (*Conf, error) {
-	configFilePath := filepath.Join(repo.conf.WorkDir, ".wizard-personal.json")
+	configFilePath := repo.configFilePath()
 	exist, err := utils.FileExist(configFilePath)
 	if err != nil {
 		return nil, err
@@ -55,6 +119,7 @@ func (repo Repo) LoadConf() (*Conf, error) {
 					URL:        "https://github.com/mylxsw/growing-up.git",
 					StorageDir: "growing-up",
 					Type:       "github",
+					Readonly:   true,
 				},
 			},
 			AuthConf: &AuthConf{
@@ -286,14 +351,14 @@ func (repo Repo) workInRepository(name string, cb interface{}) ([]interface{}, e
 }
 
 // OpenRepository 根据名称打开一个仓库
-func (repo Repo) OpenRepository(name string) (*git.Repository, error) {
+func (repo Repo) OpenRepository(name string) (*git.Repository, *RepositoryConf, error) {
 	conf, err := repo.GetRepoConfByName(name)
 	if err != nil {
-		return nil, errors.Wrap(err, "加载配置失败")
+		return nil, nil, errors.Wrap(err, "加载配置失败")
 	}
 
 	if conf == nil {
-		return nil, ErrRepositoryNotExist
+		return nil, nil, ErrRepositoryNotExist
 	}
 
 	var gitRepo *git.Repository
@@ -306,10 +371,26 @@ func (repo Repo) OpenRepository(name string) (*git.Repository, error) {
 		gitRepo = repository
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, conf, err
 	}
 
-	return gitRepo, nil
+	return gitRepo, conf, nil
+}
+
+// ResetRepository 重置仓库
+func (repo Repo) ResetRepository(name string) error {
+	conf, err := repo.GetRepoConfByName(name)
+	if err != nil {
+		return err
+	}
+
+	return repo.cc.ResolveWithError(func(fs billy.Filesystem) error {
+		if conf.StorageDir == "" {
+			return errors.New("仓库存储目录尚未设置，无法删除")
+		}
+
+		return fs.Remove(conf.StorageDir)
+	})
 }
 
 // openGitRepository 打开一个 git 仓库
@@ -342,9 +423,15 @@ func (repo Repo) openGitRepository(ctx context.Context, fs billy.Filesystem, con
 			return gitRepo, nil
 		}
 
-		return nil, errors.Wrap(err, "打开 Git 仓库失败")
+		return nil, err
 	}
 
+	head, err := gitRepo.Head()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("HEAD: %s", head.String())
 	return gitRepo, nil
 }
 
@@ -469,4 +556,14 @@ func (repo *Repo) commitChanges(name string, changed []string) error {
 	})
 
 	return err
+}
+
+// buildRepositoryStorageDir 构建仓库存储目录名称
+func (repo Repo) buildRepositoryStorageDir(repoURL string) (string, error) {
+	rawURL, err := url.Parse(repoURL)
+	if err != nil {
+		return "", errors.Wrap(err, "parse repository url failed")
+	}
+
+	return strings.TrimLeft(strings.ReplaceAll(strings.ReplaceAll(rawURL.Path, "/", "-"), "\\", "-"), "-"), nil
 }

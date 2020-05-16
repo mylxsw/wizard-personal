@@ -69,6 +69,21 @@
                 </Button>
             </div>
         </Modal>
+        <Modal v-model="resetConfirmBox" width="360">
+            <p slot="header" style="color:#f60;text-align:center">
+                <Icon type="ios-information-circle"></Icon>
+                <span>仓库打开失败</span>
+            </p>
+            <div style="text-align:center">
+                <p>{{ resetConfirmBoxMessage }}</p>
+                <p>重置仓库可能会解决该问题，是否要重置该仓库？</p>
+            </div>
+            <div slot="footer">
+                <Button type="error" size="large" long
+                        @click="resetRepo">删除已有数据并重置
+                </Button>
+            </div>
+        </Modal>
         <Split v-model="split" :style="{height: windowHeight + 'px'}">
             <div slot="left">
                 <Menu mode="horizontal" theme="primary" @on-select="controlPanelEvent" ref="leftControlPanel">
@@ -205,6 +220,8 @@
                 editorHeight: 0,
                 deleteConfirmBox: false,
                 deleteConfirmBoxLoading: false,
+                resetConfirmBox: false,
+                resetConfirmBoxMessage: '',
             }
         },
         computed: {
@@ -237,7 +254,7 @@
             resizeEditor() {
                 this.windowHeight = window.innerHeight;
                 this.editorHeight = this.windowHeight - 105;
-                this.leftTreeHeight = this.windowHeight - 30;
+                this.leftTreeHeight = this.windowHeight - 62;
             },
 
             /**
@@ -727,12 +744,38 @@
                 this.loadDocument();
                 this.loadTree();
                 this.resizeEditor();
+            },
+            /**
+             * 重置仓库
+             */
+            resetRepo() {
+                this.$Loading.start();
+                this.axios.post('/api/repo/reset/', {name: this.repoName}).then(response => {
+                    this.$Loading.finish();
+                    this.ToastSuccess('操作成功');
+                    this.resetConfirmBox = false;
+                    window.location.reload();
+                }).catch(error => {
+                    this.$Loading.error();
+                    this.resetConfirmBox = false;
+                    this.ToastError(error);
+                })
             }
         },
         mounted() {
             this.repoName = this.$route.query.ns || 'default';
-            this.reload();
             window.onresize = this.resizeEditor;
+
+            this.$Loading.start();
+            this.axios.post('/api/repo/open/', {name: this.repoName}).then(response => {
+                this.$Loading.finish();
+                this.resetConfirmBoxMessage = "";
+                this.reload();
+            }).catch(error => {
+                this.$Loading.error();
+                this.resetConfirmBoxMessage = this.ParseError(error);
+                this.resetConfirmBox = true;
+            });
         }
     }
 </script>

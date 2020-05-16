@@ -96,7 +96,7 @@ func (fs *AdapterFs) Stat(filename string) (os.FileInfo, error) {
 }
 
 func (fs *AdapterFs) Remove(filename string) error {
-	return fs.fs.Remove(filename)
+	return fs.fs.RemoveAll(filename)
 }
 
 func (fs *AdapterFs) TempFile(dir, prefix string) (billy.File, error) {
