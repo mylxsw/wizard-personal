@@ -7,25 +7,14 @@ import App from './app.vue';
 import 'view-design/dist/styles/iview.css';
 import axios from 'axios';
 import VueAxios from 'vue-axios';
-import mavonEditor from 'mavon-editor';
-import 'mavon-editor/dist/css/index.css';
 import _ from 'lodash';
+import MarkdownEditor from './components/MarkdownEditor/index'
 
 Vue.use(VueRouter);
 Vue.use(ViewUI);
 Vue.use(VueAxios, axios);
-Vue.use(mavonEditor);
 
-// TODO 更新图片预览地址
-// let originalImageHandler = mavonEditor.markdownIt.renderer.rules.image;
-// mavonEditor.markdownIt.renderer.rules.image = function () {
-//     for (let i in arguments[0][0].attrs) {
-//         if (arguments[0][0].attrs[i][0] === 'src') {
-//             // 图片地址为 arguments[0][0].attrs[i][1]
-//         }
-//     }
-//     return originalImageHandler(...arguments)
-// }
+Vue.component('MarkdownEditor', MarkdownEditor);
 
 // 路由配置
 const RouterConfig = {

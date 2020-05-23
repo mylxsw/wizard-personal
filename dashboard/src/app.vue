@@ -15,7 +15,7 @@
 
         },
         beforeMount() {
-            this.axios.defaults.baseURL = 'http://localhost:20101';
+            this.axios.defaults.baseURL = 'http://localhost:20101/';
         },
         beforeDestroy () {
 

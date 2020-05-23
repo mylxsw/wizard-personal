@@ -148,17 +148,7 @@
                         </Form>
                     </Layout>
                     <Layout>
-                        <mavon-editor v-model="content" ref="mdEditor"
-                                      :style="{height: editorHeight + 'px'}"
-                                      :editable="editable && !saving"
-                                      :toolbarsFlag="editable"
-                                      :autofocus="false"
-                                      :toolbars="markdownOption"
-                                      :ishljs="true"
-                                      :subfield="false"
-                                      :defaultOpen="editable ? 'edit':'preview'"
-                                      :boxShadow="false"
-                                      @save="save" @imgAdd="imageAdd" @imgDel="imageDel"></mavon-editor>
+                        <markdown-editor v-model="content" :height="editorHeight + 'px'" ref="mdEditor"></markdown-editor>
                     </Layout>
                 </Content>
             </div>
@@ -168,7 +158,6 @@
 
 </template>
 <script>
-
     export default {
         data() {
             return {
@@ -187,35 +176,6 @@
                 saving: false,
                 editable: false,
                 imageFiles: {},
-                markdownOption: {
-                    bold: true, // 粗体
-                    italic: true, // 斜体
-                    header: true, // 标题
-                    underline: true, // 下划线
-                    strikethrough: true, // 中划线
-                    mark: true, // 标记
-                    superscript: true, // 上角标
-                    subscript: true, // 下角标
-                    quote: true, // 引用
-                    ol: true, // 有序列表
-                    ul: true, // 无序列表
-                    link: true, // 链接
-                    imagelink: true, // 图片链接
-                    code: true, // code
-                    table: true, // 表格
-                    fullscreen: true, // 全屏编辑
-                    readmodel: true, // 沉浸式阅读
-                    help: true, // 帮助
-                    undo: true, // 上一步
-                    redo: true, // 下一步
-                    trash: true, // 清空
-                    navigation: true, // 导航目录
-                    alignleft: true, // 左对齐
-                    aligncenter: true, // 居中
-                    alignright: true, // 右对齐
-                    subfield: true, // 单双栏模式
-                    preview: true, // 预览
-                },
                 siderWidth: 350,
                 editorHeight: 0,
                 deleteConfirmBox: false,
@@ -627,6 +587,8 @@
 
                 this.editable = editable;
                 this.isNew = isNew;
+
+                this.$refs.mdEditor.scrollTop();
             },
 
             /**
@@ -760,6 +722,26 @@
                     this.resetConfirmBox = false;
                     this.ToastError(error);
                 })
+            },
+            initMarkdownEditor() {
+                let self = this;
+                let editor = self.$refs.mdEditor;
+
+                let originalImageHandler = editor.markdownIt.renderer.rules.image;
+                editor.markdownIt.renderer.rules.image =   function () {
+                    for (let i in arguments[0][0].attrs) {
+                        if (arguments[0][0].attrs[i][0] === 'src') {
+                            // 图片地址为 arguments[0][0].attrs[i][1]
+                            let imagePath = arguments[0][0].attrs[i][1];
+                            if (self._.startsWith(imagePath, "/")) {
+                                arguments[0][0].attrs[i][1] = _.trimEnd(self.axios.defaults.baseURL, '/')
+                                    + '/api/document/assets/?name=' + self.repoName
+                                    + '&filename=' + imagePath;
+                            }
+                        }
+                    }
+                    return originalImageHandler(...arguments)
+                }
             }
         },
         mounted() {
@@ -770,6 +752,7 @@
             this.axios.post('/api/repo/open/', {name: this.repoName}).then(response => {
                 this.$Loading.finish();
                 this.resetConfirmBoxMessage = "";
+                // this.initMarkdownEditor();
                 this.reload();
             }).catch(error => {
                 this.$Loading.error();

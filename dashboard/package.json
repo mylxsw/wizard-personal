@@ -15,9 +15,9 @@
   "author": "Aresn",
   "license": "MIT",
   "dependencies": {
+    "@toast-ui/editor": "^2.1.2",
     "axios": "^0.19.2",
     "lodash": "^4.17.15",
-    "mavon-editor": "^2.9.0",
     "view-design": "^4.0.0",
     "vue": "^2.5.16",
     "vue-axios": "^2.1.5",

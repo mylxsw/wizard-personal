@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -17,6 +18,7 @@ type DocumentController struct {
 func (d DocumentController) Register(router *web.Router) {
 	router.Group("/document", func(router *web.Router) {
 		router.Get("/", d.View)
+		router.Get("/assets/", d.Assets)
 		router.Post("/", d.Save)
 		router.Delete("/", d.Delete)
 	})
@@ -67,6 +69,23 @@ func (d DocumentController) Save(req web.Request, repository *repo.Repo) (*Opera
 	}
 
 	return Success()
+}
+
+func (d DocumentController) Assets(req web.Request, webCtx web.Context, repository *repo.Repo) (web.Response, error) {
+	filename := req.Input("filename")
+	name := req.Input("name")
+	if name == "" {
+		return nil, errors.New("name is required")
+	}
+
+	data, err := repository.GetFile(name, filename)
+	if err != nil {
+		return nil, err
+	}
+
+	webCtx.Response().SetContent(data)
+	webCtx.Response().SetCode(http.StatusOK)
+	return webCtx.NewRawResponse(), nil
 }
 
 func (d DocumentController) View(req web.Request, repository *repo.Repo) (*Document, error) {
